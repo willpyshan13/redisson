@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -111,6 +112,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         try {
             future.await();
         } catch (InterruptedException e) {
+            future.cancel(true);
             Thread.currentThread().interrupt();
             throw new RedisException(e);
         }
@@ -144,7 +146,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     @Override
     public <T, R> RFuture<R> readAsync(RedisClient client, MasterSlaveEntry entry, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
-        async(true, new NodeSource(entry, client), codec, command, params, mainPromise, false);
+        async(true, new NodeSource(entry, client), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
     
@@ -152,21 +154,21 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     public <T, R> RFuture<R> readAsync(RedisClient client, String name, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         int slot = connectionManager.calcSlot(name);
-        async(true, new NodeSource(slot, client), codec, command, params, mainPromise, false);
+        async(true, new NodeSource(slot, client), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
     
     public <T, R> RFuture<R> readAsync(RedisClient client, byte[] key, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         int slot = connectionManager.calcSlot(key);
-        async(true, new NodeSource(slot, client), codec, command, params, mainPromise, false);
+        async(true, new NodeSource(slot, client), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
     @Override
     public <T, R> RFuture<R> readAsync(RedisClient client, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
-        async(true, new NodeSource(client), codec, command, params, mainPromise, false);
+        async(true, new NodeSource(client), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
@@ -215,7 +217,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         for (MasterSlaveEntry entry : nodes) {
             RPromise<R> promise = new RedissonPromise<R>();
             promise.onComplete(listener);
-            async(true, new NodeSource(entry), codec, command, params, promise, true);
+            async(true, new NodeSource(entry), codec, command, params, promise, true, false);
         }
         return mainPromise;
     }
@@ -257,7 +259,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         });
 
         MasterSlaveEntry entry = nodes.remove(0);
-        async(true, new NodeSource(entry), codec, command, params, attemptPromise, false);
+        async(true, new NodeSource(entry), codec, command, params, attemptPromise, false, false);
     }
 
     @Override
@@ -312,7 +314,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         for (MasterSlaveEntry entry : nodes) {
             RPromise<T> promise = new RedissonPromise<T>();
             promise.onComplete(listener);
-            async(readOnlyMode, new NodeSource(entry), codec, command, params, promise, true);
+            async(readOnlyMode, new NodeSource(entry), codec, command, params, promise, true, false);
         }
         return mainPromise;
     }
@@ -338,7 +340,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     public <T, R> RFuture<R> readAsync(String key, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         NodeSource source = getNodeSource(key);
-        async(true, source, codec, command, params, mainPromise, false);
+        async(true, source, codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
     
@@ -346,13 +348,13 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     public <T, R> RFuture<R> readAsync(byte[] key, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         NodeSource source = getNodeSource(key);
-        async(true, source, codec, command, params, mainPromise, false);
+        async(true, source, codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
     public <T, R> RFuture<R> readAsync(MasterSlaveEntry entry, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
-        async(true, new NodeSource(entry), codec, command, params, mainPromise, false);
+        async(true, new NodeSource(entry), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
@@ -365,7 +367,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     @Override
     public <T, R> RFuture<R> writeAsync(MasterSlaveEntry entry, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
-        async(false, new NodeSource(entry), codec, command, params, mainPromise, false);
+        async(false, new NodeSource(entry), codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
@@ -377,28 +379,34 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     @Override
     public <T, R> RFuture<R> evalReadAsync(String key, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
         NodeSource source = getNodeSource(key);
-        return evalAsync(source, true, codec, evalCommandType, script, keys, params);
+        return evalAsync(source, true, codec, evalCommandType, script, keys, false, params);
     }
 
     @Override
     public <T, R> RFuture<R> evalReadAsync(MasterSlaveEntry entry, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
-        return evalAsync(new NodeSource(entry), true, codec, evalCommandType, script, keys, params);
+        return evalAsync(new NodeSource(entry), true, codec, evalCommandType, script, keys, false, params);
     }
 
     @Override
     public <T, R> RFuture<R> evalReadAsync(RedisClient client, String name, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
         int slot = connectionManager.calcSlot(name);
-        return evalAsync(new NodeSource(slot, client), true, codec, evalCommandType, script, keys, params);
+        return evalAsync(new NodeSource(slot, client), true, codec, evalCommandType, script, keys, false, params);
     }
 
     @Override
     public <T, R> RFuture<R> evalWriteAsync(String key, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
         NodeSource source = getNodeSource(key);
-        return evalAsync(source, false, codec, evalCommandType, script, keys, params);
+        return evalAsync(source, false, codec, evalCommandType, script, keys, false, params);
+    }
+
+    @Override
+    public <T, R> RFuture<R> evalWriteNoRetryAsync(String key, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
+        NodeSource source = getNodeSource(key);
+        return evalAsync(source, false, codec, evalCommandType, script, keys, true, params);
     }
 
     public <T, R> RFuture<R> evalWriteAsync(MasterSlaveEntry entry, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
-        return evalAsync(new NodeSource(entry), false, codec, evalCommandType, script, keys, params);
+        return evalAsync(new NodeSource(entry), false, codec, evalCommandType, script, keys, false, params);
     }
 
     @Override
@@ -434,7 +442,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         for (MasterSlaveEntry entry : entries) {
             RPromise<T> promise = new RedissonPromise<T>();
             promise.onComplete(listener);
-            async(readOnlyMode, new NodeSource(entry), connectionManager.getCodec(), command, args.toArray(), promise, true);
+            async(readOnlyMode, new NodeSource(entry), connectionManager.getCodec(), command, args.toArray(), promise, true, false);
         }
         return mainPromise;
     }
@@ -485,7 +493,8 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         return result.toArray();
     }
     
-    private <T, R> RFuture<R> evalAsync(NodeSource nodeSource, boolean readOnlyMode, Codec codec, RedisCommand<T> evalCommandType, String script, List<Object> keys, Object... params) {
+    private <T, R> RFuture<R> evalAsync(NodeSource nodeSource, boolean readOnlyMode, Codec codec, RedisCommand<T> evalCommandType,
+                                        String script, List<Object> keys, boolean noRetry, Object... params) {
         if (isEvalCacheActive() && evalCommandType.getName().equals("EVAL")) {
             RPromise<R> mainPromise = new RedissonPromise<R>();
             
@@ -501,7 +510,8 @@ public class CommandAsyncService implements CommandAsyncExecutor {
             args.addAll(Arrays.asList(params));
 
             RedisExecutor<T, R> executor = new RedisExecutor<>(readOnlyMode, nodeSource, codec, cmd,
-                                                        args.toArray(), promise, false, connectionManager, objectBuilder, referenceType);
+                                                        args.toArray(), promise, false,
+                                                        connectionManager, objectBuilder, referenceType, noRetry);
             executor.execute();
 
             promise.onComplete((res, e) -> {
@@ -527,7 +537,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
                                 ns = new NodeSource(nodeSource, executor.getRedisClient());
                             }
 
-                            async(readOnlyMode, ns, codec, command, newargs.toArray(), mainPromise, false);
+                            async(readOnlyMode, ns, codec, command, newargs.toArray(), mainPromise, false, noRetry);
                         });
                     } else {
                         free(pps);
@@ -547,7 +557,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
         args.add(keys.size());
         args.addAll(keys);
         args.addAll(Arrays.asList(params));
-        async(readOnlyMode, nodeSource, codec, evalCommandType, args.toArray(), mainPromise, false);
+        async(readOnlyMode, nodeSource, codec, evalCommandType, args.toArray(), mainPromise, false, noRetry);
         return mainPromise;
     }
 
@@ -560,22 +570,22 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     public <T, R> RFuture<R> writeAsync(String key, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         NodeSource source = getNodeSource(key);
-        async(false, source, codec, command, params, mainPromise, false);
+        async(false, source, codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
 
     public <T, R> RFuture<R> writeAsync(byte[] key, Codec codec, RedisCommand<T> command, Object... params) {
         RPromise<R> mainPromise = createPromise();
         NodeSource source = getNodeSource(key);
-        async(false, source, codec, command, params, mainPromise, false);
+        async(false, source, codec, command, params, mainPromise, false, false);
         return mainPromise;
     }
     
     public <V, R> void async(boolean readOnlyMode, NodeSource source, Codec codec,
             RedisCommand<V> command, Object[] params, RPromise<R> mainPromise, 
-            boolean ignoreRedirect) {
+            boolean ignoreRedirect, boolean noRetry) {
         RedisExecutor<V, R> executor = new RedisExecutor<>(readOnlyMode, source, codec, command, params, mainPromise,
-                                                    ignoreRedirect, connectionManager, objectBuilder, referenceType);
+                                                    ignoreRedirect, connectionManager, objectBuilder, referenceType, noRetry);
         executor.execute();
     }
 
@@ -587,32 +597,49 @@ public class CommandAsyncService implements CommandAsyncExecutor {
     
     @Override
     public <T, R> RFuture<R> readBatchedAsync(Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String... keys) {
-        return executeBatchedAsync(true, codec, command, callback, keys);
+        return executeBatchedAsync(true, codec, command, callback, keys, null);
+    }
+
+    @Override
+    public <T, R> RFuture<R> writeBatchedAsync(Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String... keys) {
+        return executeBatchedAsync(false, codec, command, callback, keys, null);
     }
     
     @Override
-    public <T, R> RFuture<R> writeBatchedAsync(Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String... keys) {
-        return executeBatchedAsync(false, codec, command, callback, keys);
+    public <T, R> RFuture<R> writeBatchedAsync(Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String[] keys, Map<String, ?> valueMap) {
+        return executeBatchedAsync(false, codec, command, callback, keys, valueMap);
     }
     
-    private <T, R> RFuture<R> executeBatchedAsync(boolean readOnly, Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String... keys) {
+    private <T, R> RFuture<R> executeBatchedAsync(boolean readOnly, Codec codec, RedisCommand<T> command, SlotCallback<T, R> callback, String[] keys, Map<String, ?> valueMap) {
         if (!connectionManager.isClusterMode()) {
-            if (readOnly) {
-                return readAsync((String) null, codec, command, keys);
+            List<Object> params = null;
+            if (valueMap != null) {
+                params = new ArrayList<>(keys.length * 2);
+                for (String key : keys) {
+                    params.add(key);
+                    params.add(valueMap.get(key));
+                }
+            } else {
+                params = Arrays.asList(keys);
             }
-            return writeAsync((String) null, codec, command, keys);
+            if (readOnly) {
+                return readAsync((String) null, codec, command, params.toArray());
+            }
+            return writeAsync((String) null, codec, command, params.toArray());
         }
 
-        Map<MasterSlaveEntry, List<String>> range2key = new HashMap<>();
-        for (String key : keys) {
-            int slot = connectionManager.calcSlot(key);
-            MasterSlaveEntry entry = connectionManager.getEntry(slot);
-            List<String> list = range2key.computeIfAbsent(entry, k -> new ArrayList<>());
-            list.add(key);
-        }
+        Map<MasterSlaveEntry, Map<Integer, List<String>>> entry2keys = Arrays.stream(keys).collect(
+                Collectors.groupingBy(k -> {
+                    int slot = connectionManager.calcSlot(k);
+                    return connectionManager.getEntry(slot);
+                }, Collectors.groupingBy(k -> {
+                    return connectionManager.calcSlot(k);
+                        }, Collectors.toList())));
+
+        long total = entry2keys.values().stream().mapToInt(m -> m.size()).sum();
 
         RPromise<R> result = new RedissonPromise<>();
-        AtomicLong executed = new AtomicLong(keys.length);
+        AtomicLong executed = new AtomicLong(total);
         AtomicReference<Throwable> failed = new AtomicReference<>();
         BiConsumer<T, Throwable> listener = (res, ex) -> {
             if (ex != null) {
@@ -632,7 +659,7 @@ public class CommandAsyncService implements CommandAsyncExecutor {
             }
         };
 
-        for (Entry<MasterSlaveEntry, List<String>> entry : range2key.entrySet()) {
+        for (Entry<MasterSlaveEntry, Map<Integer, List<String>>> entry : entry2keys.entrySet()) {
             // executes in batch due to CROSSLOT error
             CommandBatchService executorService;
             if (this instanceof CommandBatchService) {
@@ -641,17 +668,17 @@ public class CommandAsyncService implements CommandAsyncExecutor {
                 executorService = new CommandBatchService(this);
             }
 
-            for (String key : entry.getValue()) {
+            for (List<String> groupedKeys : entry.getValue().values()) {
                 RedisCommand<T> c = command;
-                RedisCommand<T> newCommand = callback.createCommand(key);
+                RedisCommand<T> newCommand = callback.createCommand(groupedKeys);
                 if (newCommand != null) {
                     c = newCommand;
                 }
                 if (readOnly) {
-                    RFuture<T> f = executorService.readAsync(entry.getKey(), codec, c, key);
+                    RFuture<T> f = executorService.readAsync(entry.getKey(), codec, c, callback.createParams(groupedKeys));
                     f.onComplete(listener);
                 } else {
-                    RFuture<T> f = executorService.writeAsync(entry.getKey(), codec, c, key);
+                    RFuture<T> f = executorService.writeAsync(entry.getKey(), codec, c, callback.createParams(groupedKeys));
                     f.onComplete(listener);
                 }
             }

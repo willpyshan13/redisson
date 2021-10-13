@@ -83,7 +83,7 @@ public class RedissonTest extends BaseTest {
         }
 
         ex.shutdown();
-        assertThat(ex.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(ex.awaitTermination(7, TimeUnit.SECONDS)).isTrue();
         inst.shutdown();
     }
 
@@ -434,7 +434,7 @@ public class RedissonTest extends BaseTest {
         
         System.out.println("errors " + errors + " success " + success + " readonly " + readonlyErrors);
         
-        assertThat(errors).isLessThan(800);
+        assertThat(errors).isLessThan(1300);
         assertThat(readonlyErrors).isZero();
         
         redisson.shutdown();

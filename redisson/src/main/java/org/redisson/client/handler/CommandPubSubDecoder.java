@@ -77,7 +77,7 @@ public class CommandPubSubDecoder extends CommandDecoder {
     }
 
     @Override
-    protected void decodeCommand(Channel channel, ByteBuf in, QueueCommand data) throws Exception {
+    protected void decodeCommand(Channel channel, ByteBuf in, QueueCommand data, int endIndex) throws Exception {
         if (data == null) {
             try {
                 while (in.writerIndex() > in.readerIndex()) {
@@ -208,7 +208,7 @@ public class CommandPubSubDecoder extends CommandDecoder {
     
     @Override
     protected MultiDecoder<Object> messageDecoder(CommandData<Object, Object> data, List<Object> parts) {
-        if (parts.isEmpty()) {
+        if (parts.isEmpty() || parts.get(0) == null) {
             return null;
         }
         String command = parts.get(0).toString();

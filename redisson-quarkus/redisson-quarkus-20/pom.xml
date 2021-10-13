@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.redisson</groupId>
         <artifactId>redisson-quarkus</artifactId>
-        <version>3.16.2-SNAPSHOT</version>
+        <version>3.16.4-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
@@ -20,7 +20,7 @@
      </modules>
 
      <properties>
-       <quarkus.version>2.0.0.CR3</quarkus.version>
+       <quarkus.version>2.2.0.Final</quarkus.version>
      </properties>
 
      <dependencyManagement>

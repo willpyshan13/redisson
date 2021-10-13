@@ -14,14 +14,14 @@ Maven
 <dependency>
     <groupId>org.redisson</groupId>
     <artifactId>redisson-helidon</artifactId>
-    <version>3.16.1</version>
+    <version>3.16.3</version>
 </dependency>
 ```
 
 Gradle
 
 ```groovy
-compile 'org.redisson:redisson-helidon:3.16.1'
+compile 'org.redisson:redisson-helidon:3.16.3'
 ```
 
 ### 2. Add settings into `META-INF/microprofile-config.properties` file
@@ -51,4 +51,4 @@ private RedissonClient redisson;
 
 For injection without @Named annotation use instance name - `default`. 
 
-Consider __[Redisson PRO](https://redisson.pro)__ version for **ultra-fast performance** and **support by SLA**.
+Try __[Redisson PRO](https://redisson.pro)__ with **ultra-fast performance** and **support by SLA**.

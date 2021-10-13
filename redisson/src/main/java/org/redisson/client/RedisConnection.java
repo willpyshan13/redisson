@@ -15,11 +15,11 @@
  */
 package org.redisson.client;
 
-import java.util.Queue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.util.AttributeKey;
+import io.netty.util.Timeout;
 import org.redisson.RedissonShutdownException;
 import org.redisson.api.RFuture;
 import org.redisson.client.codec.Codec;
@@ -29,12 +29,14 @@ import org.redisson.client.protocol.*;
 import org.redisson.misc.LogHelper;
 import org.redisson.misc.RPromise;
 import org.redisson.misc.RedissonPromise;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.util.AttributeKey;
-import io.netty.util.Timeout;
+import java.util.Deque;
+import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 
@@ -43,13 +45,13 @@ import io.netty.util.Timeout;
  */
 public class RedisConnection implements RedisCommands {
 
+    private static final Logger LOG = LoggerFactory.getLogger(RedisConnection.class);
     private static final AttributeKey<RedisConnection> CONNECTION = AttributeKey.valueOf("connection");
 
     final RedisClient redisClient;
 
     private volatile RPromise<Void> fastReconnect;
     private volatile boolean closed;
-    private volatile boolean queued;
     volatile Channel channel;
 
     private RPromise<?> connectionPromise;
@@ -57,8 +59,7 @@ public class RedisConnection implements RedisCommands {
     private Runnable connectedListener;
     private Runnable disconnectedListener;
 
-    private volatile boolean pooled;
-    private AtomicInteger usage = new AtomicInteger();
+    private final AtomicInteger usage = new AtomicInteger();
 
     public <C> RedisConnection(RedisClient redisClient, Channel channel, RPromise<C> connectionPromise) {
         this.redisClient = redisClient;
@@ -66,6 +67,8 @@ public class RedisConnection implements RedisCommands {
 
         updateChannel(channel);
         lastUsageTime = System.nanoTime();
+
+        LOG.debug("Connection created " + redisClient);
     }
     
     protected RedisConnection(RedisClient redisClient) {
@@ -90,22 +93,6 @@ public class RedisConnection implements RedisCommands {
         return usage.decrementAndGet();
     }
 
-    public boolean isPooled() {
-        return pooled;
-    }
-
-    public void setPooled(boolean pooled) {
-        this.pooled = pooled;
-    }
-
-    public boolean isQueued() {
-        return queued;
-    }
-
-    public void setQueued(boolean queued) {
-        this.queued = queued;
-    }
-
     public void setConnectedListener(Runnable connectedListener) {
         this.connectedListener = connectedListener;
     }
@@ -126,6 +113,19 @@ public class RedisConnection implements RedisCommands {
     
     public static <C extends RedisConnection> C getFrom(Channel channel) {
         return (C) channel.attr(RedisConnection.CONNECTION).get();
+    }
+
+    public CommandData<?, ?> getLastCommand() {
+        Deque<QueueCommandHolder> queue = channel.attr(CommandsQueue.COMMANDS_QUEUE).get();
+        if (queue != null) {
+            QueueCommandHolder holder = queue.peekLast();
+            if (holder != null) {
+                if (holder.getCommand() instanceof CommandData) {
+                    return (CommandData<?, ?>) holder.getCommand();
+                }
+            }
+        }
+        return null;
     }
 
     public CommandData<?, ?> getCurrentCommand() {
@@ -329,7 +329,7 @@ public class RedisConnection implements RedisCommands {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + "@" + System.identityHashCode(this) + " [redisClient=" + redisClient + ", channel=" + channel + ", currentCommand=" + getCurrentCommand() + "]";
+        return getClass().getSimpleName() + "@" + System.identityHashCode(this) + " [redisClient=" + redisClient + ", channel=" + channel + ", currentCommand=" + getCurrentCommand() + ", usage=" + usage + "]";
     }
 
 }

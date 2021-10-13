@@ -14,14 +14,14 @@ Maven
      <dependency>
          <groupId>org.redisson</groupId>
          <artifactId>redisson-spring-boot-starter</artifactId>
-         <version>3.16.1</version>
+         <version>3.16.3</version>
      </dependency>
 ```
 
 Gradle
 
 ```groovy
-     compile 'org.redisson:redisson-spring-boot-starter:3.16.1'
+     compile 'org.redisson:redisson-spring-boot-starter:3.16.3'
 ```
 
 
@@ -110,4 +110,4 @@ spring:
 - `RedisTemplate`  
 - `ReactiveRedisTemplate`  
 
-Consider __[Redisson PRO](https://redisson.pro)__ version for **ultra-fast performance** and **support by SLA**.
+Try __[Redisson PRO](https://redisson.pro)__ with **ultra-fast performance** and **support by SLA**.

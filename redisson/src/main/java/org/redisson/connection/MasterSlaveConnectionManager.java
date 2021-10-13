@@ -26,16 +26,14 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.resolver.AddressResolver;
 import io.netty.resolver.AddressResolverGroup;
 import io.netty.resolver.DefaultAddressResolverGroup;
 import io.netty.resolver.dns.DnsServerAddressStreamProviders;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.netty.util.*;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.ImmediateEventExecutor;
-import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.*;
 import io.netty.util.internal.PlatformDependent;
 import org.redisson.ElementsSubscribeService;
 import org.redisson.Version;
@@ -250,8 +248,7 @@ public class MasterSlaveConnectionManager implements ConnectionManager {
             }
 
             if (connection.isActive()) {
-                boolean isHostname = NetUtil.createByteArrayFromIpAddressString(addr.getHost()) == null;
-                if (isHostname) {
+                if (!addr.isIP()) {
                     RedisURI address = new RedisURI(addr.getScheme()
                                  + "://" + connection.getRedisClient().getAddr().getAddress().getHostAddress()
                                  + ":" + connection.getRedisClient().getAddr().getPort());
@@ -349,8 +346,7 @@ public class MasterSlaveConnectionManager implements ConnectionManager {
     }
 
     protected void startDNSMonitoring(RedisClient masterHost) {
-        String host = masterHost.getConfig().getAddress().getHost();
-        if (NetUtil.createByteArrayFromIpAddressString(host) != null) {
+        if (masterHost.getConfig().getAddress().isIP()) {
             return;
         }
 
@@ -693,4 +689,33 @@ public class MasterSlaveConnectionManager implements ConnectionManager {
     public RedisURI applyNatMap(RedisURI address) {
         return address;
     }
+
+    protected RFuture<RedisURI> resolveIP(RedisURI address) {
+        return resolveIP(address.getScheme(), address);
+    }
+
+    protected RFuture<RedisURI> resolveIP(String scheme, RedisURI address) {
+        if (address.isIP()) {
+            return RedissonPromise.newSucceededFuture(address);
+        }
+
+        RPromise<RedisURI> result = new RedissonPromise<>();
+        AddressResolver<InetSocketAddress> resolver = resolverGroup.getResolver(getGroup().next());
+        InetSocketAddress addr = InetSocketAddress.createUnresolved(address.getHost(), address.getPort());
+        Future<InetSocketAddress> future = resolver.resolve(addr);
+        future.addListener((FutureListener<InetSocketAddress>) f -> {
+            if (!f.isSuccess()) {
+                log.error("Unable to resolve " + address, f.cause());
+                result.tryFailure(f.cause());
+                return;
+            }
+
+            InetSocketAddress s = f.getNow();
+            RedisURI uri = new RedisURI(scheme + "://" + s.getAddress().getHostAddress() + ":" + address.getPort());
+            uri = applyNatMap(uri);
+            result.trySuccess(uri);
+        });
+        return result;
+    }
+
 }

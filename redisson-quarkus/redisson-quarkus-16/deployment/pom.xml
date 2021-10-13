@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.redisson</groupId>
         <artifactId>redisson-quarkus-16-parent</artifactId>
-        <version>3.16.2-SNAPSHOT</version>
+        <version>3.16.4-SNAPSHOT</version>
         <relativePath>../</relativePath>
     </parent>
 
@@ -17,6 +17,10 @@
       <dependency>
         <groupId>io.quarkus</groupId>
         <artifactId>quarkus-arc-deployment</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-netty-deployment</artifactId>
       </dependency>
       <dependency>
         <groupId>org.redisson</groupId>

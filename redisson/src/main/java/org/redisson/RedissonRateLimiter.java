@@ -180,6 +180,9 @@ public class RedissonRateLimiter extends RedissonExpirable implements RRateLimit
     }
     
     private <T> RFuture<T> tryAcquireAsync(RedisCommand<T> command, Long value) {
+        byte[] random = new byte[8];
+        ThreadLocalRandom.current().nextBytes(random);
+
         return commandExecutor.evalWriteAsync(getRawName(), LongCodec.INSTANCE, command,
                 "local rate = redis.call('hget', KEYS[1], 'rate');"
               + "local interval = redis.call('hget', KEYS[1], 'interval');"
@@ -200,7 +203,7 @@ public class RedissonRateLimiter extends RedissonExpirable implements RRateLimit
                      + "local expiredValues = redis.call('zrangebyscore', permitsName, 0, tonumber(ARGV[2]) - interval); "
                      + "local released = 0; "
                      + "for i, v in ipairs(expiredValues) do "
-                          + "local random, permits = struct.unpack('fI', v);"
+                          + "local random, permits = struct.unpack('Lc0I', v);"
                           + "released = released + permits;"
                      + "end; "
 
@@ -218,18 +221,18 @@ public class RedissonRateLimiter extends RedissonExpirable implements RRateLimit
                          + "local firstValue = redis.call('zrange', permitsName, 0, 0, 'withscores'); "
                          + "return 3 + interval - (tonumber(ARGV[2]) - tonumber(firstValue[2]));"
                      + "else "
-                         + "redis.call('zadd', permitsName, ARGV[2], struct.pack('fI', ARGV[3], ARGV[1])); "
+                         + "redis.call('zadd', permitsName, ARGV[2], struct.pack('Lc0I', string.len(ARGV[3]), ARGV[3], ARGV[1])); "
                          + "redis.call('decrby', valueName, ARGV[1]); "
                          + "return nil; "
                      + "end; "
               + "else "
                      + "redis.call('set', valueName, rate); "
-                     + "redis.call('zadd', permitsName, ARGV[2], struct.pack('fI', ARGV[3], ARGV[1])); "
+                     + "redis.call('zadd', permitsName, ARGV[2], struct.pack('Lc0I', string.len(ARGV[3]), ARGV[3], ARGV[1])); "
                      + "redis.call('decrby', valueName, ARGV[1]); "
                      + "return nil; "
               + "end;",
                 Arrays.asList(getRawName(), getValueName(), getClientValueName(), getPermitsName(), getClientPermitsName()),
-                value, System.currentTimeMillis(), ThreadLocalRandom.current().nextLong());
+                value, System.currentTimeMillis(), random);
     }
 
     @Override
@@ -318,7 +321,7 @@ public class RedissonRateLimiter extends RedissonExpirable implements RRateLimit
                      + "local expiredValues = redis.call('zrangebyscore', permitsName, 0, tonumber(ARGV[1]) - interval); "
                      + "local released = 0; "
                      + "for i, v in ipairs(expiredValues) do "
-                          + "local random, permits = struct.unpack('fI', v);"
+                          + "local random, permits = struct.unpack('Lc0I', v);"
                           + "released = released + permits;"
                      + "end; "
 

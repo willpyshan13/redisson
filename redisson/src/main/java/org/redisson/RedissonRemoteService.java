@@ -83,7 +83,7 @@ public class RedissonRemoteService extends BaseRemoteService implements RRemoteS
     @Override
     protected RFuture<Boolean> addAsync(String requestQueueName, RemoteServiceRequest request,
             RemotePromise<Object> result) {
-        RFuture<Boolean> future = commandExecutor.evalWriteAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        RFuture<Boolean> future = commandExecutor.evalWriteNoRetryAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
                   "redis.call('hset', KEYS[2], ARGV[1], ARGV[2]);"
                 + "redis.call('rpush', KEYS[1], ARGV[1]); "
                 + "return 1;",
@@ -96,7 +96,7 @@ public class RedissonRemoteService extends BaseRemoteService implements RRemoteS
 
     @Override
     protected RFuture<Boolean> removeAsync(String requestQueueName, RequestId taskId) {
-        return commandExecutor.evalWriteAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        return commandExecutor.evalWriteNoRetryAsync(name, LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
                 "if redis.call('lrem', KEYS[1], 1, ARGV[1]) > 0 then "
                         + "redis.call('hdel', KEYS[2], ARGV[1]);" +
                            "return 1;" +
@@ -262,7 +262,7 @@ public class RedissonRemoteService extends BaseRemoteService implements RRemoteS
         if (entry == null) {
             return;
         }
-        RFuture<String> take = requestQueue.takeAsync();
+        RFuture<String> take = requestQueue.pollAsync(60, TimeUnit.SECONDS);
         entry.setFuture(take);
         take.onComplete((requestId, e) -> {
                 Entry entr = remoteMap.get(remoteInterface);
@@ -290,6 +290,11 @@ public class RedissonRemoteService extends BaseRemoteService implements RRemoteS
                 
                 if (entry.getCounter().decrementAndGet() > 0) {
                     subscribe(remoteInterface, requestQueue, executor, bean);
+                }
+
+                // poll method may return null value
+                if (requestId == null) {
+                    return;
                 }
 
                 RMap<String, RemoteServiceRequest> tasks = getMap(((RedissonObject) requestQueue).getRawName() + ":tasks");

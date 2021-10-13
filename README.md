@@ -6,7 +6,7 @@
 [Quick start](https://github.com/redisson/redisson#quick-start) | [Documentation](https://github.com/redisson/redisson/wiki/Table-of-Content) | [Changelog](https://github.com/redisson/redisson/blob/master/CHANGELOG.md) | [Code examples](https://github.com/redisson/redisson-examples) | [FAQs](https://github.com/redisson/redisson/wiki/16.-FAQ) | [Report an issue](https://github.com/redisson/redisson/issues/new)
 
 Based on high-performance async and lock-free Java Redis client and [Netty](http://netty.io) framework.  
-JDK compatibility:  1.8 - 16, Android  
+JDK compatibility:  1.8 - 17, Android  
 
 ## Features
 
@@ -104,14 +104,14 @@ Used by
     <dependency>
        <groupId>org.redisson</groupId>
        <artifactId>redisson</artifactId>
-       <version>3.16.1</version>
+       <version>3.16.3</version>
     </dependency>  
 
 #### Gradle
-    compile 'org.redisson:redisson:3.16.1'  
+    compile 'org.redisson:redisson:3.16.3'  
 
 #### SBT
-    libraryDependencies += "org.redisson" % "redisson" % "3.16.1"
+    libraryDependencies += "org.redisson" % "redisson" % "3.16.3"
 
 #### Java
 
@@ -165,12 +165,12 @@ RExecutorService executor = redisson.getExecutorService("myExecutorService");
 
 ```
 
-Consider __[Redisson PRO](https://redisson.pro)__ version for **ultra-fast performance** and **support by SLA**.
+Try __[Redisson PRO](https://redisson.pro)__ with **ultra-fast performance** and **support by SLA**.
 
 ## Downloads
    
-[Redisson 3.16.1](https://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.redisson&a=redisson&v=3.16.1&e=jar),
-[Redisson node 3.16.1](https://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.redisson&a=redisson-all&v=3.16.1&e=jar)  
+[Redisson 3.16.3](https://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.redisson&a=redisson&v=3.16.3&e=jar),
+[Redisson node 3.16.3](https://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.redisson&a=redisson-all&v=3.16.3&e=jar)  
 
 ## FAQs
 
